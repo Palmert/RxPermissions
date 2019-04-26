@@ -41,8 +41,6 @@ class MainActivity : AppCompatActivity() {
     surfaceView = findViewById(R.id.surfaceView)
 
 
-
-
     val permissionRequest = PermissionRequest(
         requestPermission = { rxPermissionsFragment ->
           rxPermissionsFragment.startActivityForResult(
@@ -58,7 +56,7 @@ class MainActivity : AppCompatActivity() {
     )
     disposable = RxView.clicks(findViewById(R.id.enableCamera))
         // Ask for permissions when button is clicked
-        .compose(rxPermissions.ensureEach(Permission(permission.CAMERA), Permission(permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, permissionRequest)))
+        .flatMap { rxPermissions.requestEachCombined(Permission(permission.CAMERA), Permission(permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, permissionRequest), Permission(permission.READ_EXTERNAL_STORAGE))}
         .subscribe({ permission ->
           Log.i(TAG, "Permission result $permission")
         },

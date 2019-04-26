@@ -7,6 +7,7 @@ import android.os.Build
 import android.os.Bundle
 import android.support.v4.app.Fragment
 import android.util.Log
+import io.reactivex.disposables.CompositeDisposable
 
 import java.util.HashMap
 
@@ -17,6 +18,7 @@ class RxPermissionsFragment : Fragment() {
   // Contains all the current permission requests.
   // Once granted or denied, they are removed from it.
   private val mSubjects = HashMap<String, PublishSubject<Permission>>()
+  private val disposables = CompositeDisposable()
   private var mLogging: Boolean = false
   private lateinit var currentPermission: Permission
 
@@ -25,15 +27,31 @@ class RxPermissionsFragment : Fragment() {
     retainInstance = true
   }
 
+  override fun onDestroy() {
+    disposables.clear()
+    super.onDestroy()
+  }
+
   @TargetApi(Build.VERSION_CODES.M)
   internal fun requestPermissions(permissions: Array<Permission>) {
-    val standardPermissionRequests = permissions.filter { it.permissionRequest == null }.map { it.name }.toTypedArray()
-    if (standardPermissionRequests.isNotEmpty()) {
-      requestPermissions(standardPermissionRequests, PERMISSIONS_REQUEST_CODE)
-    }
-    permissions.filter { it.permissionRequest != null }.forEach {
-      currentPermission = it
-      it.permissionRequest?.requestPermission?.invoke(this)
+    requestPermission(permissions.iterator())
+  }
+
+  private fun requestPermission(permissionsIterator: Iterator<Permission>) {
+    if (permissionsIterator.hasNext()) {
+      val permission = permissionsIterator.next()
+      currentPermission = permission
+
+      if (permission.permissionRequest != null) {
+        permission.permissionRequest.requestPermission(this)
+      } else {
+        requestPermissions(arrayOf(permission.name), PERMISSIONS_REQUEST_CODE)
+      }
+
+      val subject = mSubjects[permission.name]
+      if (subject != null) {
+        disposables.add(subject.subscribe { requestPermission(permissionsIterator) })
+      }
     }
   }
 
@@ -73,8 +91,6 @@ class RxPermissionsFragment : Fragment() {
       i++
     }
   }
-
-
 
   override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
     super.onActivityResult(requestCode, resultCode, data)
